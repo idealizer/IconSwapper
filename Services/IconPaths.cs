@@ -82,11 +82,15 @@ public static class IconPaths
         return (path, index);
     }
 
+    public static string LegacyDataRoot() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "IconCraft");
+
     public static string AppDataRoot()
     {
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var current = Path.Combine(local, "IconSwapper");
-        var legacy = Path.Combine(local, "IconCraft");
+        var legacy = LegacyDataRoot();
         if (!Directory.Exists(current) && Directory.Exists(legacy))
         {
             try

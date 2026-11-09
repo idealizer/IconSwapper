@@ -248,6 +248,49 @@
                             </StackPanel>
                         </Grid>
 
+                        <DockPanel Margin="0,18,0,6">
+                            <TextBlock DockPanel.Dock="Right" FontSize="12" VerticalAlignment="Bottom">
+                                <Hyperlink NavigateUri="https://icons8.com" RequestNavigate="Icons8Link_RequestNavigate">Icons by Icons8</Hyperlink>
+                            </TextBlock>
+                            <TextBlock Text="Or pick one from Icons8" FontWeight="SemiBold"/>
+                        </DockPanel>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Search" Click="Icons8Search_Click"
+                                    Style="{StaticResource QuietButton}" Margin="8,0,0,0"/>
+                            <ComboBox x:Name="Icons8Style" DockPanel.Dock="Right" Width="130" Margin="8,0,0,0"
+                                      DisplayMemberPath="Label" VerticalContentAlignment="Center"
+                                      SelectionChanged="Icons8Style_SelectionChanged"/>
+                            <TextBox x:Name="Icons8Box" KeyDown="Icons8Box_KeyDown" ToolTip="Search Icons8, such as docx or spreadsheet"/>
+                        </DockPanel>
+                        <ListBox x:Name="Icons8List" Height="196" Margin="0,8,0,0" SelectionChanged="Icons8List_SelectionChanged"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                    <Setter Property="Margin" Value="0,0,4,4"/>
+                                    <Setter Property="Padding" Value="6"/>
+                                    <Setter Property="ToolTip" Value="{Binding Tip}"/>
+                                    <Setter Property="Cursor" Value="Hand"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Image Width="44" Height="44" Source="{Binding Thumbnail}"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <DockPanel Margin="0,6,0,0">
+                            <Button x:Name="Icons8More" DockPanel.Dock="Right" Content="More" Click="Icons8More_Click"
+                                    Style="{StaticResource QuietButton}" Padding="10,4" IsEnabled="False"/>
+                            <TextBlock x:Name="Icons8Status" Text="Choose a file type to see matching icons."
+                                       Foreground="#8A837A" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </DockPanel>
+
                         <TextBlock Text="File types" FontWeight="SemiBold" Margin="0,18,0,6"/>
                         <ItemsControl x:Name="ChoiceList">
                             <ItemsControl.ItemTemplate>

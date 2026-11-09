@@ -108,6 +108,36 @@ public static class ShortcutUpdater
         return errors;
     }
 
+    public static int Relink(IEnumerable<LinkRecord> links, string oldDir, string newDir)
+    {
+        var shell = CreateShell();
+        if (shell == null)
+            return 0;
+
+        var fixedCount = 0;
+        foreach (var link in links)
+        {
+            if (string.IsNullOrWhiteSpace(link.Path) || !File.Exists(link.Path))
+                continue;
+            try
+            {
+                dynamic shortcut = shell.CreateShortcut(link.Path);
+                string icon = shortcut.IconLocation ?? "";
+                if (!icon.Contains(oldDir, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                shortcut.IconLocation = icon.Replace(oldDir, newDir, StringComparison.OrdinalIgnoreCase);
+                shortcut.Save();
+                fixedCount++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or COMException)
+            {
+                // A shortcut that cannot be saved keeps its old icon path.
+            }
+        }
+
+        return fixedCount;
+    }
+
     private static bool MatchesExe(dynamic shortcut, string file, string exePath)
     {
         string target = shortcut.TargetPath ?? "";

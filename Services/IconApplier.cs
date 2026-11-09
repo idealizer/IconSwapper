@@ -155,6 +155,34 @@ public static class IconApplier
         return "Restored some shortcuts for " + Path.GetFileName(exePath) + ". Could not change " + string.Join(", ", errors) + ".";
     }
 
+    public static int RepairMovedIcons()
+    {
+        var oldDir = Path.Combine(IconPaths.LegacyDataRoot(), "icons") + Path.DirectorySeparatorChar;
+        var newDir = IconDirectory() + Path.DirectorySeparatorChar;
+        var store = Load();
+        var repaired = 0;
+
+        var keys = store.Extensions.Values
+            .SelectMany(record => record.KeyPaths)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        foreach (var subKey in keys)
+        {
+            EnsureIconKey(subKey);
+            using var key = Registry.CurrentUser.OpenSubKey(subKey, writable: true);
+            if (key?.GetValue("", null, RegistryValueOptions.DoNotExpandEnvironmentNames) is not string value)
+                continue;
+            if (!value.Contains(oldDir, StringComparison.OrdinalIgnoreCase))
+                continue;
+            key.SetValue("", value.Replace(oldDir, newDir, StringComparison.OrdinalIgnoreCase), RegistryValueKind.String);
+            repaired++;
+        }
+
+        foreach (var record in store.Shortcuts.Values)
+            repaired += ShortcutUpdater.Relink(record.Links, oldDir, newDir);
+
+        return repaired;
+    }
+
     public static bool HasExtension(string extension)
     {
         extension = IconPaths.NormalizeExtension(extension) ?? extension;

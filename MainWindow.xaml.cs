@@ -21,6 +21,11 @@ public partial class MainWindow : Window
     private bool _fromApp;
     private bool _refreshingHits;
     private bool _working;
+    private readonly ObservableCollection<Icons8Icon> _icons8 = [];
+    private int _icons8Search;
+    private int _icons8Offset;
+    private int _icons8Total;
+    private bool _icons8Filling;
 
     public MainWindow()
     {
@@ -28,6 +33,9 @@ public partial class MainWindow : Window
         ResultsList.ItemsSource = _hits;
         ChoiceList.ItemsSource = _choices;
         LibraryList.ItemsSource = _library;
+        Icons8List.ItemsSource = _icons8;
+        Icons8Style.ItemsSource = Icons8Client.Styles;
+        Icons8Style.SelectedIndex = 0;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -35,6 +43,9 @@ public partial class MainWindow : Window
         SetStatus("Reading file types…");
         try
         {
+            var repaired = await Task.Run(IconApplier.RepairMovedIcons);
+            if (repaired > 0)
+                ShellRefresh.Notify();
             _reader = await Task.Run(AssociationReader.Load);
             RefreshLibrary();
             if (!string.IsNullOrWhiteSpace(IconApplier.LoadWarning))
@@ -113,6 +124,8 @@ public partial class MainWindow : Window
 
         LoadExtensions(preset.Extensions, contextExe: null, fromApp: false, keepChecks: false);
         HeaderTitle.Text = preset.Name;
+        Icons8Box.Text = preset.Name;
+        _ = SearchIcons8(append: false);
     }
 
     private void AddExtension_Click(object sender, RoutedEventArgs e) => AddExtension();
@@ -176,8 +189,100 @@ public partial class MainWindow : Window
         }
 
         if (!keepChecks)
+        {
             ShortcutCheck.IsChecked = ShortcutTargets().Count > 0;
+            if (_baseExtensions.Count > 0)
+            {
+                Icons8Box.Text = _baseExtensions[0].TrimStart('.');
+                _ = SearchIcons8(append: false);
+            }
+        }
         UpdateEditor();
+    }
+
+    private void Icons8Search_Click(object sender, RoutedEventArgs e) => _ = SearchIcons8(append: false);
+
+    private void Icons8Box_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+            _ = SearchIcons8(append: false);
+    }
+
+    private void Icons8Style_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (IsLoaded && !string.IsNullOrWhiteSpace(Icons8Box.Text))
+            _ = SearchIcons8(append: false);
+    }
+
+    private void Icons8More_Click(object sender, RoutedEventArgs e) => _ = SearchIcons8(append: true);
+
+    private void Icons8Link_RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+        e.Handled = true;
+    }
+
+    private async Task SearchIcons8(bool append)
+    {
+        var term = Icons8Box.Text.Trim();
+        if (term.Length == 0)
+        {
+            Icons8Status.Text = "Type something to search, such as docx or spreadsheet.";
+            return;
+        }
+
+        var style = (Icons8Style.SelectedItem as Icons8Style)?.Code ?? "";
+        var search = ++_icons8Search;
+        var offset = append ? _icons8Offset : 0;
+        Icons8More.IsEnabled = false;
+        Icons8Status.Text = "Searching Icons8…";
+        try
+        {
+            var (icons, total) = await Icons8Client.SearchAsync(term, style, offset);
+            if (search != _icons8Search)
+                return;
+
+            _icons8Filling = true;
+            if (!append)
+                _icons8.Clear();
+            foreach (var icon in icons)
+                _icons8.Add(icon);
+            _icons8Filling = false;
+
+            _icons8Offset = offset + icons.Count;
+            _icons8Total = total;
+            Icons8More.IsEnabled = icons.Count > 0 && _icons8Offset < _icons8Total;
+            Icons8Status.Text = _icons8.Count == 0
+                ? "No icons found. Try another word or style."
+                : $"Showing {_icons8.Count} of {_icons8Total}. Click one to use it.";
+        }
+        catch (Exception ex)
+        {
+            if (search != _icons8Search)
+                return;
+            _icons8Filling = false;
+            Icons8Status.Text = "Icons8 could not be reached: " + ex.Message;
+        }
+    }
+
+    private async void Icons8List_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_icons8Filling || Icons8List.SelectedItem is not Icons8Icon icon)
+            return;
+
+        Icons8Status.Text = "Downloading " + icon.Name + "…";
+        try
+        {
+            var file = await Icons8Client.DownloadAsync(icon);
+            if (Icons8List.SelectedItem != icon)
+                return;
+            ChooseImage(file);
+            Icons8Status.Text = icon.Name + " from Icons8 is ready. Check the file types, then choose Use this icon.";
+        }
+        catch (Exception ex)
+        {
+            Icons8Status.Text = "Download failed: " + ex.Message;
+        }
     }
 
     private void UpdateEditor()
