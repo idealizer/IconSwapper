@@ -1,0 +1,60 @@
+# Publishes the installer when a version tag is pushed (v1.0.0).
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2025
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Tag must look like v1.2.3."
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "VERSION=$version" -Encoding utf8NoBOM
+          dotnet publish IconSwapper.csproj -c Release -o artifacts/app `
+            -p:Version=$version -p:FileVersion=$version -p:InformationalVersion=$version
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP "innosetup-6.7.3.exe"
+          Invoke-WebRequest "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe" -OutFile $setup
+          Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait
+
+      - name: Compile the installer
+        shell: pwsh
+        run: |
+          $iscc = @(
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "Inno Setup compiler was not found." }
+          $root = (Get-Location).Path
+          New-Item -ItemType Directory -Force -Path (Join-Path $root "dist") | Out-Null
+          & $iscc "/DMyAppVersion=$env:VERSION" "/DPublishDir=$root\artifacts\app" "/O$root\dist" installer\IconSwapper.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/IconSwapper-Setup-*.exe
+          generate_release_notes: true

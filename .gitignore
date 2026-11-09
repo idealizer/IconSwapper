@@ -1,0 +1,8 @@
+bin/
+obj/
+publish/
+out/
+dist/
+artifacts/
+.vs/
+*.user
